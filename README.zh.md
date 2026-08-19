@@ -25,11 +25,26 @@
 
 ## 安装
 
+这个包自带 `dsh.bundle` manifest,所以用 `dsh plugin` 一步就能装好并挂进某个 profile:
+
 ```sh
-npm install dsh-plugin-modality-fallback
+dsh plugin --profile web add dsh-plugin-modality-fallback
+# 或者直接从 GitHub 装,不需要发布到 npm:
+dsh plugin --profile web add github:lilei0311/dsh-plugin-modality-fallback
 ```
 
-## 使用
+这会把这个包追加进 profile 的 `dsh.profile.bundles`,并应用 [`cordis.patch.yml`](cordis.patch.yml)——插入的插件行默认 `fallback: {}`(还没配置任何路由,所有请求行为跟没装这个插件之前完全一样)。要配置真正的备用路由,在你自己 profile 或者 `$DSH_HOME` 的 `cordis.patch.yml` 里重新声明这一行的 `config`(patch 是整个替换 `config`,所以 id 也要写上):
+
+```yaml
+- id: modality-fallback
+  config:
+    fallback:
+      image: { provider: deepseek-official, model: deepseek-vision }
+```
+
+用 `dsh --profile web --dump-config` 可以确认这一行确实生效了。完整的 bundle/profile 机制见 [deepseek-harness 的插件安装教程](https://github.com/deepseek-ai/deepseek-harness/blob/main/docs/user/develop/basic/publish.md)。
+
+### 编程方式使用(自己内嵌 `dsh`)
 
 ```ts
 import ModalityFallback from 'dsh-plugin-modality-fallback'

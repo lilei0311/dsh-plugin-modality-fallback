@@ -25,11 +25,26 @@ No core `deepseek-harness` code is modified. This is an ordinary Cordis plugin, 
 
 ## Install
 
+This package declares a `dsh.bundle` manifest, so `dsh plugin` installs and wires it into a profile in one step:
+
 ```sh
-npm install dsh-plugin-modality-fallback
+dsh plugin --profile web add dsh-plugin-modality-fallback
+# or straight from GitHub, no npm publish needed:
+dsh plugin --profile web add github:lilei0311/dsh-plugin-modality-fallback
 ```
 
-## Use
+That appends this package to the profile's `dsh.profile.bundles` and applies [`cordis.patch.yml`](cordis.patch.yml), which inserts the plugin row with an empty `fallback: {}` (no routes configured yet — every request behaves exactly as before). Configure a real route by restating that row's `config` in your own profile's or `$DSH_HOME`'s `cordis.patch.yml` (a patch replaces the whole `config`, so restate the id too):
+
+```yaml
+- id: modality-fallback
+  config:
+    fallback:
+      image: { provider: deepseek-official, model: deepseek-vision }
+```
+
+`dsh --profile web --dump-config` shows the composed row so you can confirm it landed. See [deepseek-harness's plugin-install tutorial](https://github.com/deepseek-ai/deepseek-harness/blob/main/docs/user/develop/basic/publish.md) for the full bundle/profile mechanics this relies on.
+
+### Programmatic use (embedding `dsh` yourself)
 
 ```ts
 import ModalityFallback from 'dsh-plugin-modality-fallback'

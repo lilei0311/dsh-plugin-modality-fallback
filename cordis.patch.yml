@@ -1,0 +1,10 @@
+# The dsh-plugin-modality-fallback bundle patch: the layer `dsh plugin add`
+# (or a manual cordis.patch.yml `insert`) applies when a profile lists this
+# package as a bundle. Empty `fallback` by default — restate this row's
+# `config` in your own profile/home cordis.patch.yml to add routes, since a
+# patch replaces a row's whole config rather than deep-merging it.
+- insert:
+    - id: modality-fallback
+      name: dsh-plugin-modality-fallback
+      config:
+        fallback: {}
