@@ -119,7 +119,27 @@ export class ModalityFallback extends Service {
     const needed = requiredModalities(payload.agent.session.deriveMessages())
     if (needed.length === 0) return resolved
 
-    const info = await this.ctx.llm.resolveModelInfo(resolved.provider, resolved.model, payload.signal)
+    // No route configured for anything this request needs: nothing this
+    // plugin could do with a capability probe result anyway, so skip it.
+    // Without this check, an install with the default empty `fallback: {}`
+    // (README: "no routes configured yet — every request behaves exactly as
+    // before") still paid for a resolveModelInfo call on every image-bearing
+    // request, for a result it was always going to discard.
+    if (!needed.some(modality => this.fallback[modality] !== undefined)) return resolved
+
+    let info: { inputModalities?: readonly ModelModality[] }
+    try {
+      info = await this.ctx.llm.resolveModelInfo(resolved.provider, resolved.model, payload.signal)
+    } catch (error) {
+      // This probe only ever helps route around a missing modality; it must
+      // never be the reason an otherwise-working request fails. `resolved`
+      // was already validated by every other `agent/request` listener —
+      // an adapter hiccup answering "does it declare image input?" is no
+      // reason to fail the whole turn on a request that may not have even
+      // needed the fallback.
+      this.ctx.logger.warn(`modality-fallback: capability probe failed for "${resolved.provider}/${resolved.model}", leaving route unchanged: ${String(error)}`)
+      return resolved
+    }
     const missing = needed.find(modality => !declaresModality(info.inputModalities, modality))
     if (missing === undefined) return resolved
 

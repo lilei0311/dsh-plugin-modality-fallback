@@ -113,7 +113,7 @@ describe('ModalityFallback', () => {
   })
 
   it('passes the route through unchanged when no fallback is configured for the missing modality', async () => {
-    const { ctx } = await boot({
+    const { ctx, llm } = await boot({
       'primary/text-only': { provider: 'primary', id: 'text-only', name: 'text-only', inputModalities: ['text'] },
     }, { fallback: {} })
     const agent = agentWithHistory([imageMessage])
@@ -121,6 +121,35 @@ describe('ModalityFallback', () => {
     await expect(agentEvents(ctx, agent).waterfall(
       'agent/request', { turn: 1, step: 0, signal }, () => Promise.resolve(seed),
     )).resolves.toBe(seed)
+    // The README promises the default install (`fallback: {}`) means "every
+    // request behaves exactly as before" — that only holds if this plugin
+    // doesn't even probe capability when it has no route to act on the
+    // result with. This used to call resolveModelInfo anyway, on every
+    // image-bearing request, for a result it was always going to discard.
+    expect(llm.calls).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('fails open (route unchanged, no throw) when the capability probe itself errors', async () => {
+    const ctx = new Context()
+    class ThrowingLlm extends Service {
+      constructor(c: Context) { super(c, 'llm') }
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async resolveModelInfo(): Promise<LlmResolvedModelInfo> {
+        throw new Error('adapter unreachable (simulated network blip)')
+      }
+    }
+    await ctx.plugin(ThrowingLlm)
+    await ctx.plugin(ModalityFallback, { fallback: { image: { provider: 'vision', model: 'vision-1' } } })
+    const agent = agentWithHistory([imageMessage])
+
+    // `resolved` (primary/vision-capable) was already fine for this request
+    // — a transient failure probing "does it declare image input?" must not
+    // fail a request that may not even have needed the fallback.
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 1, step: 0, signal },
+      () => Promise.resolve({ provider: 'primary', model: 'vision-capable' } as LlmCallConfig),
+    )).resolves.toEqual({ provider: 'primary', model: 'vision-capable' })
     await ctx.fiber.dispose()
   })
 
