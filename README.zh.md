@@ -65,6 +65,7 @@ await ctx.plugin(ModalityFallback, {
 - **`read_image` 和 `ApiProxy` 自己的门控不受影响。** 它们在请求真正构建*之前*就已经根据会话当前选定的模型做出拒绝判断,所以即便这个插件已经为对应模态配置好了可用的备用路由,它们依然会拒绝。要修复这一点需要改动 `deepseek-harness` 核心本身(让这些门控在拒绝前先咨询本插件或等价能力)——这超出了一个不改核心代码的插件的范围。
 - **模型能力未知时按"可以"处理。** 当 `resolveModelInfo(...).inputModalities` 为 `undefined`(能力未知)时,插件不会触发路由——这与 `ApiProxy` 现有的发送/切换模型门控一致,但比 `read_image` 更宽松(`read_image` 在能力未知时会直接拒绝)。如果部署方希望在能力未知时也触发路由,应该让对应的 adapter 显式声明 `inputModalities`。
 - **切换路由会丢弃继承的 reasoning effort**,而不是把可能不被备用模型支持的 effort 继续透传下去;转而使用备用路由自身 adapter/provider 的默认值。
+- **能力探测失败时会放行,不会拖垮请求。** `resolveModelInfo` 是 adapter 自己的异步 I/O,有可能失败(网络问题、adapter 返回的元数据校验不过等)。这个插件本来就只是"锦上添花"——帮忙绕开一个缺失的模态,所以探测失败时只会打一条 `ctx.logger.warn` 警告,路由保持不变,不会让整个请求跟着失败,哪怕这次请求原本选中的模型压根不需要备用路由。探测本身在这次请求需要的模态里一个都没配路由时会直接跳过(默认安装的 `fallback: {}` 永远不会触发它),所以这条只在你已经配置了路由之后才用得上。
 
 ## 为什么是插件,而不是提交给 `deepseek-harness` 的 PR
 
